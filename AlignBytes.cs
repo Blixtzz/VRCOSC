@@ -13,6 +13,15 @@ namespace SocketCshart
         static List<object> _arguments;
         public static Socket _sock;
         public static IPEndPoint _remoteIpEndPoint;
+        static string serverIP = "127.0.0.1";
+        static int serverPort = 9000;
+
+        public static void Startup()
+        {
+            AlignBytes._sock = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            var addresses = Dns.GetHostAddresses(serverIP);
+            AlignBytes._remoteIpEndPoint = new IPEndPoint(addresses[0], serverPort);
+        }
         public static void Send(string address, params object[] args)
         {
             _arguments = new List<object>();

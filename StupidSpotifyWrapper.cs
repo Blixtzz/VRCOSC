@@ -1,58 +1,65 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using System.Xml.XPath;
+using SocketCshart;
 
-namespace SocketCshart
+class StupidSpotifyWrapper
 {
-    internal class StupidSpotifyWrapper
+    private const string currentlyPlayingUrl = "https://api.spotify.com/v1/me/player/currently-playing";
+ public static async Task<string> GetCurrentlyPlayingTrack()
     {
-        static int process;
-        public static string GetOther(string processListen)
+        if (DateTime.Now >= Auth.TokenExpirationTime)
         {
-            var Processs = Process.GetProcessesByName(processListen).FirstOrDefault(p => !string.IsNullOrWhiteSpace(p.MainWindowTitle));
-            if (Processs == null)
-            {
-                return "Process Closed";
-            }
-            return Processs.MainWindowTitle;
+            Console.WriteLine("Access token expired. Refreshing...");
+            await Auth.RefreshAccessTokenAsync();
         }
-        public static string SpotifySend()
-        {
-            if (process == 0 || Process.GetProcessById(process) == null)
-            {
-                process = GetSpotifyPid();
-                Console.WriteLine($"process collected: {process}, dont close spotify >:(");
-            }
-            string window = Process.GetProcessById(process).MainWindowTitle;
-            if (window != null)
-            {
-                string result = "fuck you";
-                if (window == "Advertisement" || window == "Spotify Free" || window == "Spotify Premium")
-                    result = $"Music Paused";
-                else
-                    result = window;
 
-                if (result.Contains("("))
-                {
-                    string[] subs = result.Split("(");
-                     
-                    result = subs[0];
-                }
-                return result;
-            }
-            return null;
-        }
-        private static int GetSpotifyPid()
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Auth.AccessToken);
+
+        var response = await client.GetAsync(currentlyPlayingUrl);
+        if (response.IsSuccessStatusCode)
         {
-            foreach (Process p in Process.GetProcesses())
-                if (p.ProcessName == "Spotify")
+            var json = await response.Content.ReadAsStringAsync();
+            var jsonDocument = JsonDocument.Parse(json);
+
+            if (jsonDocument.RootElement.TryGetProperty("item", out var item) &&
+                item.TryGetProperty("name", out var trackName))
+            {
+                var artistNames = string.Join(", ", item.GetProperty("artists")
+                    .EnumerateArray()
+                    .Select(artist => artist.GetProperty("name").GetString()));
+
+                var durationMs = item.GetProperty("duration_ms").GetInt32();
+                var progressMs = jsonDocument.RootElement.GetProperty("progress_ms").GetInt32();
+
+                var duration = TimeSpan.FromMilliseconds(durationMs);
+                var progress = TimeSpan.FromMilliseconds(progressMs);
+                var track = trackName.GetString();
+                if (track.Contains("("))
                 {
-                    return p.Id;
+                    track = trackName.GetString().Split("(")[0];                
+                    string linet = $"{track}by {artistNames}" + "{/v}" + $"{progress.Minutes}:{progress.Seconds:D2} / {duration.Minutes}:{duration.Seconds:D2}";
+                    return linet;
                 }
-            return 0;
+                string line = $"{track} by {artistNames}" + "{/v}" + $"{progress.Minutes}:{progress.Seconds:D2} / {duration.Minutes}:{duration.Seconds:D2}";
+
+                return line;
+            }
+            else
+            {
+                Console.WriteLine("No song is currently playing.");
+            }
         }
+        else
+        {
+            Console.WriteLine("Error retrieving currently playing song.");
+        }
+        return null;
     }
 }
