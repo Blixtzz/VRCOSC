@@ -10,8 +10,9 @@ using SocketCshart;
 
 class StupidSpotifyWrapper
 {
+    public static bool isSong = false;
     private const string currentlyPlayingUrl = "https://api.spotify.com/v1/me/player/currently-playing";
- public static async Task<string> GetCurrentlyPlayingTrack()
+    public static async Task<string> GetCurrentlyPlayingTrack()
     {
         if (DateTime.Now >= Auth.TokenExpirationTime)
         {
@@ -48,7 +49,7 @@ class StupidSpotifyWrapper
                     return linet;
                 }
                 string line = $"{track} by {artistNames}" + "{/v}" + $"{progress.Minutes}:{progress.Seconds:D2} / {duration.Minutes}:{duration.Seconds:D2}";
-
+                isSong = Song(line);
                 return line;
             }
             else
@@ -60,6 +61,16 @@ class StupidSpotifyWrapper
         {
             Console.WriteLine("Error retrieving currently playing song.");
         }
-        return null;
+        return "null";
+    }
+    private static string holder = "";
+    private static bool Song(string input)
+    {
+        if (holder == input)
+        {
+            return true;
+        }
+        holder = input;
+        return false; 
     }
 }
